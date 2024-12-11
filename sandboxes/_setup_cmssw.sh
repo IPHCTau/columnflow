@@ -64,6 +64,7 @@ setup_cmssw() {
     #
 
     local mode="${1:-}"
+    #local mode="reinstall"
 
     # default mode
     if [ -z "${mode}" ]; then

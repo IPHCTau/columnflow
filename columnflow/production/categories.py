@@ -36,8 +36,12 @@ def category_ids(
     """
     Assigns each event an array of category ids.
     """
-    category_ids = []
+    debug = kwargs.get("debug", False)
+    category_ids_list = []
+    category_ids_debug_dict = {} # noqa
 
+    category_ids = ak.singletons(np.ones(len(events), dtype=np.int64))[:, :0]
+    
     for cat_inst, categorizers in self.categorizer_map.items():
         # start with a true mask
         cat_mask = np.ones(len(events), dtype=bool)
@@ -47,19 +51,27 @@ def category_ids(
             events, mask = self[categorizer](events, **kwargs)
             cat_mask = cat_mask & mask
 
+        if debug:
+            category_ids_debug_dict[cat_inst.name] = {"id": cat_inst.id, "nevents": int(ak.sum(cat_mask))} # noqa
+        
         # covert to nullable array with the category ids or none, then apply ak.singletons
         ids = ak.where(cat_mask, np.float64(cat_inst.id), np.float64(np.nan))
-        category_ids.append(ak.singletons(ak.nan_to_none(ids)))
+        category_ids_list.append(ak.singletons(ak.nan_to_none(ids)))
 
+        if len(category_ids_list) == 100:
+            category_ids = ak.concatenate([category_ids, *category_ids_list], axis=1)
+            category_ids_list = []
+
+        
     # combine
-    category_ids = ak.concatenate(category_ids, axis=1)
-
+    category_ids = ak.concatenate([category_ids, *category_ids_list], axis=1)
+    
     # save, optionally on a target events array
     if target_events is None:
         target_events = events
     target_events = set_ak_column(target_events, "category_ids", category_ids, value_type=np.int64)
 
-    return target_events
+    return target_events, category_ids_debug_dict
 
 
 @category_ids.init

@@ -446,7 +446,6 @@ def create_category_combinations(
                 # build the name
                 root_cats = dict(zip(_group_names, root_cats))
                 cat_name = name_fn(root_cats)
-
                 # skip when already existing
                 if skip_existing and config.has_category(cat_name, deep=True):
                     continue

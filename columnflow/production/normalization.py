@@ -86,12 +86,20 @@ def get_br_from_inclusive_dataset(
         if proc.id not in proc_ds_map or proc.is_leaf_process:
             continue
 
+        """
         # get the mc weights for the "mother" dataset and add an entry for the process
         sum_mc_weight = stats[proc_ds_map[proc.id].name]["sum_mc_weight"]
         sum_mc_weight_per_process = stats[proc_ds_map[proc.id].name]["sum_mc_weight_per_process"]
         # use the number of events to compute the error on the branching ratio
         num_events = stats[proc_ds_map[proc.id].name]["num_events"]
         num_events_per_process = stats[proc_ds_map[proc.id].name]["num_events_per_process"]
+        """
+        # get the mc weights for the "mother" dataset and add an entry for the process
+        sum_mc_weight = stats[proc_ds_map[proc.id].name]["sum_filtered_mc_weight"]
+        sum_mc_weight_per_process = stats[proc_ds_map[proc.id].name]["sum_filtered_mc_weight_per_process"]
+        # use the number of events to compute the error on the branching ratio
+        num_events = stats[proc_ds_map[proc.id].name]["num_filtered_events"]
+        num_events_per_process = stats[proc_ds_map[proc.id].name]["num_filtered_events_per_process"]
 
         # compute the branching ratios for the children wrt the mother process
         for child_proc in child_procs:
@@ -206,6 +214,7 @@ def normalization_weights(self: Producer, events: ak.Array, **kwargs) -> ak.Arra
     if self.allow_stitching and self.get_xsecs_from_inclusive_dataset and self.dataset_inst == self.inclusive_dataset:
         incl_norm_weight = events.mc_weight * self.inclusive_weight
         events = set_ak_column(events, self.weight_name_incl, incl_norm_weight, value_type=np.float32)
+
     return events
 
 
@@ -320,13 +329,31 @@ def normalization_weights_setup(
             else 0
         )
         for process_id, br in branching_ratios.items():
-            sum_weights = merged_selection_stats["sum_mc_weight_per_process"][str(process_id)]
-            process_weight_table[0, process_id] = lumi * inclusive_xsec * br / sum_weights
+            #sum_weights = merged_selection_stats["sum_mc_weight_per_process"][str(process_id)]
+            #process_weight_table[0, process_id] = lumi * inclusive_xsec * br / sum_weights
+
+            # new
+            logger.info(f"process_id : {process_id}, br : {br}")
+            #sum_weights_total = merged_selection_stats["sum_mc_weight_per_process"][str(process_id)]
+            sum_weights_total = merged_selection_stats["sum_mc_weight"]
+            logger.info(f"sum_weights_total : {sum_weights_total}")
+            sum_weights_filtered_per_proc = merged_selection_stats["sum_filtered_mc_weight_per_process"][str(process_id)]
+            logger.info(f"sum_weights_filtered_per_proc : {sum_weights_filtered_per_proc}")
+            sum_weights = sum_weights_total * sum_weights_filtered_per_proc/merged_selection_stats["sum_filtered_mc_weight"]
+            if sum_weights > 0.0:
+                logger.info(f"sum_weights : {sum_weights}")
+            else:
+                logger.warning(f"{sum_weights} sum_weights : keeping the wt as zero")
+                
+            process_weight_table[0, process_id] = lumi * inclusive_xsec * br / sum_weights if sum_weights > 0.0 else 0.0
+            
+            
     else:
         for process_inst in process_insts:
             if self.config_inst.campaign.ecm not in process_inst.xsecs.keys():
                 continue
             sum_weights = merged_selection_stats["sum_mc_weight_per_process"][str(process_inst.id)]
+            #sum_weights = self.dataset_inst.n_events
             xsec = process_inst.get_xsec(self.config_inst.campaign.ecm).nominal
             process_weight_table[0, process_inst.id] = lumi * xsec / sum_weights
 
@@ -352,7 +379,7 @@ def normalization_weights_init(self: Producer) -> None:
     if self.allow_stitching and self.get_xsecs_from_inclusive_dataset and self.dataset_inst == self.inclusive_dataset:
         self.weight_name_incl = f"{self.weight_name}_inclusive_only"
         self.produces.add(self.weight_name_incl)
-
+    
 
 stitched_normalization_weights = normalization_weights.derive(
     "stitched_normalization_weights", cls_dict={

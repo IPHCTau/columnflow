@@ -30,7 +30,7 @@ def get_met_filters_default(self) -> Iterable[str]:
 
 
 @selector(
-    uses={"event"},
+    uses={"event", "Flag.*"},
     # function to obtain met filters from the config
     get_met_filters=get_met_filters_default,
 )
@@ -97,4 +97,4 @@ def met_filters_init(self: Selector) -> None:
 
     # store filters as an attribute for faster lookup
     self.met_filters = set(met_filters)
-    self.uses |= self.met_filters
+    #self.uses |= self.met_filters

@@ -11,7 +11,7 @@ import math
 
 from columnflow.selection import Selector, SelectionResult, selector
 from columnflow.util import maybe_import, InsertableDict
-from columnflow.columnar_util import set_ak_column, flat_np_view, optional_column as optional
+from columnflow.columnar_util import set_ak_column, flat_np_view, layout_ak_array,  optional_column as optional
 
 np = maybe_import("numpy")
 ak = maybe_import("awkward")
@@ -22,7 +22,7 @@ logger = law.logger.get_logger(__name__)
 
 @selector(
     uses={
-        "Jet.{pt,eta,phi,mass,jetId,chEmEF}", optional("Jet.puId"),
+        "Jet.{pt,eta,phi,mass,jetId,chEmEF,neEmEF,muonIdx1,muonIdx2}", optional("Jet.puId"),
         "Muon.{pt,eta,phi,mass,isPFcand}",
     },
     produces={"Jet.veto_map_mask"},
@@ -57,13 +57,24 @@ def jet_veto_map(
     muon = events.Muon[events.Muon.isPFcand]
 
     # loose jet selection
+    """
     jet_mask = (
         (jet.pt > 15) &
         (jet.jetId >= 2) &  # tight id
         (jet.chEmEF < 0.9) &
         ak.all(events.Jet.metric_table(muon) >= 0.2, axis=2)
     )
-
+    """
+    # https://cms-talk.web.cern.ch/t/jet-veto-maps-for-run3/57850/6
+    jet_mask = (
+        (jet.pt > 15) &
+        ((jet.jetId == 2) | (jet.jetId == 6)) &
+        ((jet.chEmEF + jet.neEmEF) < 0.9) &
+        (jet.muonIdx1 == -1) &
+        (jet.muonIdx2 == -1)
+        #ak.all(events.Jet.metric_table(muon) >= 0.2, axis=2)
+    )
+    
     # apply loose Jet puId in Run 2 to jets with pt below 50 GeV
     if self.config_inst.campaign.x.run == 2:
         jet_pu_mask = (events.Jet.puId >= 4) | (events.Jet.pt >= 50)
@@ -72,6 +83,14 @@ def jet_veto_map(
     jet_phi = jet.phi
     jet_eta = jet.eta
 
+
+    # max eta
+    #from IPython import embed; embed()
+    #self.veto_map["data"]["content"][0]["value"]["edges"][0][0]
+
+
+
+    
     # for some reason, math.pi is not included in the ranges, so we need to subtract a small number
     pi = math.pi - 1e-10
 
@@ -114,14 +133,23 @@ def jet_veto_map(
     # evalute the veto map only for selected jets
     # (a map value of != 0 means the jet is vetoed)
     veto_mask = jet_mask
+    veto_map_value = self.veto_map(*inputs)
     flat_veto_mask = flat_np_view(veto_mask)
-    flat_veto_mask[flat_veto_mask] = ak.flatten(self.veto_map(*inputs) != 0)
+    flat_veto_mask[flat_veto_mask] = ak.flatten(veto_map_value > 0)
+
+    final_veto_mask = layout_ak_array(flat_veto_mask, events.Jet.eta)
+    #has_bad_jets = ak.any(final_veto_mask, axis=1)
+
+    #flat_veto_mask = flat_np_view(veto_mask)
+    #flat_veto_mask[flat_veto_mask] = ak.flatten(self.veto_map(*inputs) != 0)
     # store the per-jet veto mask
-    events = set_ak_column(events, "Jet.veto_map_mask", veto_mask)
+    #events = set_ak_column(events, "Jet.veto_map_mask", veto_mask)
+    events = set_ak_column(events, "Jet.veto_map_mask", final_veto_mask)
 
     # create the selection result
     results = SelectionResult(
-        steps={"jet_veto_map": ~ak.any(veto_mask, axis=1)},
+        #steps={"jet_veto_map": ~ak.any(veto_mask, axis=1)},
+        steps={"jet_veto_map": ~ak.any(final_veto_mask, axis=1)},
     )
 
     return events, results
@@ -131,14 +159,13 @@ def jet_veto_map(
 def jet_veto_map_init(self: Selector, **kwargs) -> None:
     if getattr(self, "config_inst", None) is None:
         return
-
-    if (
-        self.config_inst.campaign.x.year == 2023 and
-        self.config_inst.campaign.x.postfix.lower() == "bpix"
-    ):
-        # in postBPix, we need to run the veto map with type=jetvetomap_bpix and subtract this from
-        # the result of the nominal jet veto map
-        raise NotImplementedError("Jet Veto Map for 2023 postBPix not implemented yet")
+    #if (
+    #    self.config_inst.campaign.x.year == 2023 and
+    #    self.config_inst.campaign.x.postfix.lower() == "bpix"
+    #):
+    #    # in postBPix, we need to run the veto map with type=jetvetomap_bpix and subtract this from
+    #    # the result of the nominal jet veto map
+    #    raise NotImplementedError("Jet Veto Map for 2023 postBPix not implemented yet")
 
 
 @jet_veto_map.requires

@@ -202,7 +202,7 @@ def plot_all(
 
     rax = None
     if not skip_ratio:
-        fig, axs = plt.subplots(2, 1, gridspec_kw=dict(height_ratios=[3, 1], hspace=0), sharex=True)
+        fig, axs = plt.subplots(2, 1, gridspec_kw=dict(height_ratios=[3, 1], hspace=0.05), sharex=True)
         (ax, rax) = axs
     else:
         fig, ax = plt.subplots()
@@ -256,7 +256,8 @@ def plot_all(
         # hard-coded line at 1
         rax.axhline(y=1.0, linestyle="dashed", color="gray")
         rax_kwargs = {
-            "ylim": (0.72, 1.28),
+            #"ylim": (0.72, 1.28),
+            "ylim": (0.54, 1.46),
             "ylabel": "Ratio",
             "xlabel": "Variable",
             "yscale": "linear",
@@ -270,10 +271,11 @@ def plot_all(
     fig.align_labels()
 
     # legend
+    """
     if not skip_legend:
         # resolve legend kwargs
         legend_kwargs = {
-            "ncol": 1,
+            "ncol": 3,
             "loc": "upper right",
         }
         legend_kwargs.update(style_config.get("legend_cfg", {}))
@@ -296,6 +298,49 @@ def plot_all(
 
             handles = shuffle(handles, in_stack)
             labels = shuffle(labels, in_stack)
+
+        # make legend using ordered handles/labels
+        ax.legend(handles, labels, **legend_kwargs)
+    """
+    if not skip_legend:
+        # resolve legend kwargs
+        legend_kwargs = {
+            "ncols": 3,
+            "bbox_to_anchor": (0.12, 0.30, 0.78, 0.60),
+            "loc": "upper center",
+            "entries_per_column" : 3,
+            "fontsize" : 17,
+        }
+        legend_kwargs.update(style_config.get("legend_cfg", {}))
+
+        if "title" in legend_kwargs:
+            legend_kwargs["title"] = remove_label_placeholders(legend_kwargs["title"])
+
+        # retrieve the legend handles and their labels
+        handles, labels = ax.get_legend_handles_labels()
+
+        # custom argument: entries_per_column
+        n_cols = legend_kwargs.get("ncols", 1)
+        entries_per_col = legend_kwargs.pop("entries_per_column", None)
+        if callable(entries_per_col):
+            entries_per_col = entries_per_col(ax, handles, labels, n_cols)
+        if entries_per_col and n_cols > 1:
+            if isinstance(entries_per_col, (list, tuple)):
+                assert len(entries_per_col) == n_cols
+            else:
+                entries_per_col = [entries_per_col] * n_cols
+            # fill handles and labels with empty entries
+            max_entries = max(entries_per_col)
+            empty_handle = ax.plot([], label="", linestyle="None")[0]
+            for i, n in enumerate(entries_per_col):
+                for _ in range(max_entries - min(n, len(handles) - sum(entries_per_col[:i]))):
+                    handles.insert(i * max_entries + n, empty_handle)
+                    labels.insert(i * max_entries + n, "")
+
+        # custom hook to adjust handles and labels
+        update_handles_labels = legend_kwargs.pop("update_handles_labels", None)
+        if callable(update_handles_labels):
+            update_handles_labels(ax, handles, labels, n_cols)
 
         # make legend using ordered handles/labels
         ax.legend(handles, labels, **legend_kwargs)

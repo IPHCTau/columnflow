@@ -67,14 +67,19 @@ def electron_weights(
         events.Electron.deltaEtaSC[electron_mask]
     ), axis=1)
     pt = flat_np_view(events.Electron.pt[electron_mask], axis=1)
-
+    phi = flat_np_view(events.Electron.phi[electron_mask], axis=1)    
     # loop over systematics
     for syst, postfix in [
         ("sf", ""),
         ("sfup", "_up"),
         ("sfdown", "_down"),
     ]:
-        sf_flat = self.electron_sf_corrector(self.year, syst, self.wp, sc_eta, pt)
+
+        sf_flat = None
+        if self.config_inst.campaign.x.year < 2023:
+            sf_flat = self.electron_sf_corrector(self.year, syst, self.wp, sc_eta, pt)
+        else:
+            sf_flat = self.electron_sf_corrector(self.year, syst, self.wp, sc_eta, pt, phi)
 
         # add the correct layout to it
         sf = layout_ak_array(sf_flat, events.Electron.pt[electron_mask])
@@ -117,7 +122,7 @@ def electron_weights_setup(
     self.electron_sf_corrector = correction_set[corrector_name]
 
     # check versions
-    if self.electron_sf_corrector.version not in (2,):
+    if self.electron_sf_corrector.version not in (2,3,):
         raise Exception(
             f"unsuppprted electron sf corrector version {self.electron_sf_corrector.version}",
         )

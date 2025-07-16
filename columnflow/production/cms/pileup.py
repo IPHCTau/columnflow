@@ -36,11 +36,12 @@ def pu_weight(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     Based on the number of primary vertices, assigns each event pileup weights using correctionlib.
     """
     # compute the indices for looking up weights
-    indices = events.Pileup.nTrueInt.to_numpy().astype("int32") - 1
+    #indices = events.Pileup.nTrueInt.to_numpy().astype("int32") - 1
 
     # map the variable names from the corrector to our columns
     variable_map = {
-        "NumTrueInteractions": indices,
+        #"NumTrueInteractions": indices,
+        "NumTrueInteractions": events.Pileup.nTrueInt,
     }
 
     for column_name, syst in (

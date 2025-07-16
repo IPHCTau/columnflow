@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from columnflow.types import Sequence
 from columnflow.util import maybe_import, try_float
-from columnflow.plotting.plot_util import get_position, get_cms_label
+from columnflow.plotting.plot_util import get_position, get_cms_label #, remove_label_placeholders
 
 hist = maybe_import("hist")
 np = maybe_import("numpy")
@@ -313,8 +313,8 @@ def plot_all(
         }
         legend_kwargs.update(style_config.get("legend_cfg", {}))
 
-        if "title" in legend_kwargs:
-            legend_kwargs["title"] = remove_label_placeholders(legend_kwargs["title"])
+        #if "title" in legend_kwargs:
+        #    legend_kwargs["title"] = remove_label_placeholders(legend_kwargs["title"])
 
         # retrieve the legend handles and their labels
         handles, labels = ax.get_legend_handles_labels()

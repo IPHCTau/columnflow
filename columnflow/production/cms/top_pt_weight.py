@@ -137,4 +137,4 @@ def top_pt_weight_skip(self: Producer) -> bool:
     if not getattr(self, "dataset_inst", None):
         return False
 
-    return self.dataset_inst.is_data or not self.dataset_inst.has_tag("is_ttbar")
+    return self.dataset_inst.is_data or not self.dataset_inst.has_tag("is_tt")
